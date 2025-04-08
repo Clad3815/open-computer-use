@@ -1,6 +1,6 @@
 # Open Computer Use - AI Assistant to Control Windows Computer
 
-Open Computer Use is a project that allows an AI model to interact with a Windows environment through a web interface, similar to a ChatGPT operator but with whole computer control (Not only the browser) and running locally. The system captures the screen, analyzes its content, and can execute actions such as clicking, typing text, scrolling, and running PowerShell commands.
+Open Computer Use is a project that allows an AI model to interact with a Windows environment through a web interface, similar to 'Operator' from ChatGPT but with whole computer control (Not only the browser) and running locally. The system captures the screen, analyzes its content, and can execute actions such as clicking, typing text, scrolling, and running PowerShell commands.
 
 
 ## Demo
