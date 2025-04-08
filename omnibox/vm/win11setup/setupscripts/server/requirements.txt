@@ -1,0 +1,5 @@
+flask
+PyAutoGUI
+Pillow
+opencv-python
+playwright

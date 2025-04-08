@@ -1,0 +1,31 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.1.10",
+    "@ai-sdk/google": "^1.1.16",
+    "@ai-sdk/openai": "^1.1.13",
+    "ai": "^4.1.44",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-sse": "^0.5.3",
+    "image-size": "^1.2.0",
+    "lucide-react": "^0.475.0",
+    "puppeteer": "^24.2.1",
+    "strip-ansi": "^7.1.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
