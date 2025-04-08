@@ -7,7 +7,10 @@ Open Computer Use is a project that allows an AI model to interact with a Window
 
 Here is a video of the system in action:
 
-https://github.com/user-attachments/assets/4df94f1d-57bf-4d99-a523-49dae4444118
+
+
+https://github.com/user-attachments/assets/8ad10247-ba6f-4414-a48c-0e43451977ad
+
 
 
 ## System Architecture
