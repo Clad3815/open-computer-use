@@ -13,7 +13,7 @@ import imageSize from 'image-size';
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from 'url';
-// Installer strip-ansi avec: npm install strip-ansi
+// Install strip-ansi with: npm install strip-ansi
 import stripAnsi from 'strip-ansi';
 dotenv.config();
 
@@ -21,14 +21,14 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cache pour les descriptions de screenshots
+// Cache for screenshot descriptions
 const screenshotDescriptionCache = new Map();
 let isTaskDone = false;
 let isWaitingForUserResponse = false;
 // Request tracking system
 const activeRequests = new Map();
 
-// Initialisation de l'application Express
+// Initialization of the Express application
 const app = express();
 const PORT = 2977;
 
@@ -38,9 +38,9 @@ app.use(express.json());
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_API_KEY, timeout: 10000 });
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 10000 });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 10000 });
-// État global pour le fallback
+// Global state for fallback
 let isInFallbackMode = false;
-let globalMessages = []; // Variable globale pour stocker les messages
+let globalMessages = []; // Global variable to store messages
 let consecutiveWaitCount = 0; // Track consecutive wait actions
 
 // -- Configuration ------------------------------------------------------------
@@ -70,7 +70,7 @@ const CONFIG = {
     SEND_PARSED_SCREENSHOT: false,
     SEND_SCREENSHOT: true,
     CONVERT_SCREENSHOT_TO_DESCRIPTION: false,
-    TEMPERATURE: 0.7, // Paramètre de température pour l'IA
+    TEMPERATURE: 0.7, // Temperature parameter for the AI
     PRICE_PER_MILLION_TOKENS: {
         "gemini-2.0-flash": {
             PROMPT: 0.10,
@@ -94,7 +94,7 @@ const CONFIG = {
 
 // -- Settings Management ------------------------------------------------------
 
-// Liste des paramètres modifiables via l'interface
+// List of settings editable via the interface
 const EDITABLE_SETTINGS = [
     'AI_MODEL',
     'TEMPERATURE',
@@ -106,50 +106,50 @@ const EDITABLE_SETTINGS = [
     'MAX_SITUATION_ANALYSIS_IN_HISTORY'
 ];
 
-// Charge les paramètres depuis le fichier
+// Loads settings from the file
 function loadSettings() {
     try {
         if (fs.existsSync(CONFIG.SETTINGS_FILE_PATH)) {
             const data = fs.readFileSync(CONFIG.SETTINGS_FILE_PATH, "utf8");
             const settings = JSON.parse(data);
 
-            // Met à jour le CONFIG avec les paramètres chargés
+            // Updates CONFIG with loaded settings
             EDITABLE_SETTINGS.forEach(key => {
                 if (settings[key] !== undefined) {
                     CONFIG[key] = settings[key];
                 }
             });
 
-            console.log("Paramètres chargés avec succès");
+            console.log("Settings loaded successfully");
         } else {
-            // Si le fichier n'existe pas, on le crée avec les valeurs par défaut
+            // If the file does not exist, create it with default values
             saveSettings();
         }
     } catch (error) {
-        console.error("Erreur lors du chargement des paramètres:", error);
+        console.error("Error loading settings:", error);
     }
 }
 
-// Sauvegarde les paramètres dans le fichier
+// Saves settings to the file
 function saveSettings() {
     try {
-        // Extrait uniquement les paramètres modifiables
+        // Extracts only editable settings
         const settingsToSave = {};
         EDITABLE_SETTINGS.forEach(key => {
             settingsToSave[key] = CONFIG[key];
         });
 
         fs.writeFileSync(CONFIG.SETTINGS_FILE_PATH, JSON.stringify(settingsToSave, null, 2));
-        console.log("Paramètres sauvegardés avec succès");
+        console.log("Settings saved successfully");
     } catch (error) {
-        console.error("Erreur lors de la sauvegarde des paramètres:", error);
+        console.error("Error saving settings:", error);
     }
 }
 
-// Essaie de charger les paramètres au démarrage
+// Tries to load settings on startup
 loadSettings();
 
-// Avant le chargement du prompt de base
+// Before loading the base prompt
 function getScreenshotPromptSuffix() {
     const prefix = "\n\nFor each interaction, you will receive the following information:\n1. A list of all detected bounding boxes by IDs on the screen and their descriptions. Only elements with interactivity=true are interactive; the rest are non-interactive (for context only).";
 
@@ -176,7 +176,7 @@ function getScreenshotPromptSuffix() {
     }
 }
 
-// Convertir un screenshot en description textuelle
+// Convert a screenshot to a text description
 async function convertScreenshotToDescription(screenshot) {
     const { object } = await generateObject({
         model: google("gemini-2.0-flash", {
@@ -209,7 +209,7 @@ async function convertScreenshotToDescription(screenshot) {
 
 5. If you're unsure about any element or its purpose, state that you're unsure and describe what you see to the best of your ability.
 
-Remember, the goal is to provide a comprehensive description that would allow someone who cannot see the image to understand exactly what is displayed on the screen. 
+Remember, the goal is to provide a comprehensive description that would allow someone who cannot see the image to understand exactly what is displayed on the screen.
 Be objective and focus on describing what you see rather than interpreting or making assumptions about the user's actions or intentions.`,
             },
             {
@@ -233,14 +233,14 @@ Be objective and focus on describing what you see rather than interpreting or ma
     return object.description;
 }
 
-// Chargement et modification du prompt de base
+// Loading and modifying the base prompt
 const BASE_PROMPT = fs.readFileSync(CONFIG.BASE_PROMPT_PATH, "utf8").replace("{{SCREENSHOT_PROMPT_SUFFIX}}", getScreenshotPromptSuffix());
 
-// -- Gestion de l'état global -------------------------------------------------
+// -- Global State Management -------------------------------------------------
 
 let clientHistory = [];
 
-// Suivi des coûts des requêtes
+// Request Cost Tracking
 let totalRequestPrice = {
     promptPrice: 0,
     completionPrice: 0,
@@ -251,31 +251,31 @@ let totalRequestPrice = {
 };
 
 /**
- * Formate un nombre en prix avec 6 décimales.
- * @param {number} price - Le prix à formater.
- * @returns {string} Le prix formaté.
+ * Formats a number as a price with 6 decimals.
+ * @param {number} price - The price to format.
+ * @returns {string} The formatted price.
  */
 function formatPrice(price) {
     return Number(price).toFixed(6);
 }
 
-// -- Gestion de l'historique --------------------------------------------------
+// -- History Management --------------------------------------------------
 
 function saveClientHistory() {
     try {
         fs.writeFileSync(CONFIG.CLIENT_HISTORY_FILE_PATH, JSON.stringify(clientHistory, null, 2));
-        console.log("Historique client sauvegardé avec succès");
+        console.log("Client history saved successfully");
     } catch (error) {
-        console.error("Erreur lors de la sauvegarde de l'historique client :", error);
+        console.error("Error saving client history:", error);
     }
 }
 
 function saveMessagesHistory() {
     try {
         fs.writeFileSync(CONFIG.MESSAGES_HISTORY_FILE_PATH, JSON.stringify(globalMessages, null, 2));
-        console.log("Historique des messages sauvegardé avec succès");
+        console.log("Message history saved successfully");
     } catch (error) {
-        console.error("Erreur lors de la sauvegarde de l'historique des messages :", error);
+        console.error("Error saving message history:", error);
     }
 }
 
@@ -284,10 +284,10 @@ function loadClientHistory() {
         if (fs.existsSync(CONFIG.CLIENT_HISTORY_FILE_PATH)) {
             const data = fs.readFileSync(CONFIG.CLIENT_HISTORY_FILE_PATH, "utf8");
             clientHistory = JSON.parse(data);
-            console.log("Historique client chargé avec succès");
+            console.log("Client history loaded successfully");
         }
     } catch (error) {
-        console.error("Erreur lors du chargement de l'historique client :", error);
+        console.error("Error loading client history:", error);
         clientHistory = [];
     }
 }
@@ -297,15 +297,15 @@ function loadMessagesHistory() {
         if (fs.existsSync(CONFIG.MESSAGES_HISTORY_FILE_PATH)) {
             const data = fs.readFileSync(CONFIG.MESSAGES_HISTORY_FILE_PATH, "utf8");
             globalMessages = JSON.parse(data);
-            console.log("Historique des messages chargé avec succès");
+            console.log("Message history loaded successfully");
         }
     } catch (error) {
-        console.error("Erreur lors du chargement de l'historique des messages :", error);
+        console.error("Error loading message history:", error);
         globalMessages = [];
     }
 }
 
-// -- Fonctions utilitaires (IA, actions, parsing, etc.) -----------------------
+// -- Utility Functions (AI, actions, parsing, etc.) -----------------------
 
 // Singleton Puppeteer browser instance
 let browserInstance = null;
@@ -391,7 +391,7 @@ async function parseScreenshot(base64Image) {
         });
         return response.data;
     } catch (error) {
-        console.error("Erreur lors du parsing de la capture :", error);
+        console.error("Error parsing the capture:", error);
         throw error;
     }
 }
@@ -425,32 +425,32 @@ function calculateRequestPrice(usage, model) {
 
 
 /**
- * Nettoie la sortie PowerShell en supprimant les séquences d'échappement ANSI et autres caractères de contrôle,
- * rendant la sortie plus lisible dans les réponses JSON
- * @param {string} output - La chaîne de sortie PowerShell brute
- * @returns {string} La chaîne de sortie nettoyée
+ * Cleans PowerShell output by removing ANSI escape sequences and other control characters,
+ * making the output more readable in JSON responses
+ * @param {string} output - The raw PowerShell output string
+ * @returns {string} The cleaned output string
  */
 function cleanPowerShellOutput(output) {
     if (!output) return "";
 
     try {
-        // Étape 2: Suppression de toutes les séquences d'échappement ANSI
+        // Step 2: Removal of all ANSI escape sequences
         let cleaned = stripAnsi(output);
 
-        // Étape 3: Suppression des retours chariot sans saut de ligne (évite duplication)
+        // Step 3: Removal of carriage returns without newline (avoids duplication)
         cleaned = cleaned.replace(/\r(?!\n)/g, '');
 
-        // Étape 4: Remplacement des caractères Unicode spéciaux
-        cleaned = cleaned.replace(/[\u2500-\u257F]/g, '-'); // Caractères de dessin de boîte
-        cleaned = cleaned.replace(/[\u2580-\u259F]/g, '#'); // Éléments de bloc
-        cleaned = cleaned.replace(/â–ˆ/g, '#');            // Bloc spécifique souvent présent
-        cleaned = cleaned.replace(/â€"/g, '-');            // Tiret cadratin
+        // Step 4: Replacement of special Unicode characters
+        cleaned = cleaned.replace(/[\u2500-\u257F]/g, '-'); // Box drawing characters
+        cleaned = cleaned.replace(/[\u2580-\u259F]/g, '#'); // Block elements
+        cleaned = cleaned.replace(/â–ˆ/g, '#');            // Specific block often present
+        cleaned = cleaned.replace(/â€"/g, '-');            // Em dash
 
-        // Étape 5: Normalisation des espaces (conserve les sauts de ligne)
-        cleaned = cleaned.replace(/[ \t]+/g, ' ');        // Réduit les espaces multiples
-        cleaned = cleaned.replace(/\n[\s\t]*\n+/g, '\n\n'); // Réduit les lignes vides
+        // Step 5: Normalization of spaces (preserves newlines)
+        cleaned = cleaned.replace(/[ \t]+/g, ' ');        // Reduces multiple spaces
+        cleaned = cleaned.replace(/\n[\s\t]*\n+/g, '\n\n'); // Reduces empty lines
 
-        // Étape 6: Tronquer les sorties longues
+        // Step 6: Truncate long outputs
         const MAX_LENGTH = 10000;
         if (cleaned.length > MAX_LENGTH) {
             const firstHalf = cleaned.substring(0, 5000);
@@ -461,10 +461,10 @@ function cleanPowerShellOutput(output) {
 
         return cleaned.trim();
     } catch (error) {
-        // Fallback en cas d'erreur (par ex. si strip-ansi n'est pas installé)
+        // Fallback in case of error (e.g., if strip-ansi is not installed)
         console.error("Error in cleanPowerShellOutput:", error);
 
-        // Version fallback sans strip-ansi
+        // Fallback version without strip-ansi
         let fallbackCleaned = output.replace(/\u0000/g, '');
         fallbackCleaned = fallbackCleaned.replace(/\u001b\[\??[0-9;]*[a-zA-Z]/g, '');
         fallbackCleaned = fallbackCleaned.replace(/\u001b\][0-9];.*?(\u0007|\u001b\\)/g, '');
@@ -474,9 +474,7 @@ function cleanPowerShellOutput(output) {
     }
 }
 
-
-
-// Configuration simple des modèles supportés
+// Simple configuration of supported models
 const SUPPORTED_MODELS = {
     'openai': (modelName) => openai(modelName, {
         structuredOutputs: true,
@@ -491,13 +489,13 @@ function getAIModel(modelString) {
     const [provider, fullModelName] = modelString.split('/');
 
     if (!provider || !fullModelName) {
-        throw new Error('Format de modèle invalide. Utilisez: "provider/model-name"');
+        throw new Error('Invalid model format. Use: "provider/model-name"');
     }
 
     let modelName = fullModelName;
     let providerOptions = {};
 
-    // Gestion des modèles spéciaux avec des options spécifiques
+    // Handling special models with specific options
     if (provider.toLowerCase() === 'openai') {
         if (fullModelName.startsWith('o3-mini-low')) {
             modelName = 'o3-mini';
@@ -511,7 +509,7 @@ function getAIModel(modelString) {
         }
     } else if (provider.toLowerCase() === 'anthropic') {
         if (fullModelName.includes('-thinking')) {
-            // Extraire le nom de base du modèle en enlevant "-thinking"
+            // Extract the base model name by removing "-thinking"
             modelName = fullModelName.replace('-thinking', '');
             providerOptions = {
                 thinking: { type: 'enabled', budgetTokens: 12000 }
@@ -521,7 +519,7 @@ function getAIModel(modelString) {
 
     const createModel = SUPPORTED_MODELS[provider.toLowerCase()];
     if (!createModel) {
-        throw new Error(`Provider non supporté: ${provider}`);
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
     return {
@@ -532,9 +530,9 @@ function getAIModel(modelString) {
 }
 
 /**
- * Vérifie le statut d'un job PowerShell
- * @param {string} jobId - L'ID du job PowerShell à vérifier
- * @returns {Promise<Object>} - Le statut du job
+ * Checks the status of a PowerShell job
+ * @param {string} jobId - The ID of the PowerShell job to check
+ * @returns {Promise<Object>} - The job status
  */
 async function checkPowershellJobStatus(jobId) {
     try {
@@ -543,7 +541,7 @@ async function checkPowershellJobStatus(jobId) {
         });
         return response.data;
     } catch (error) {
-        console.error(`Erreur lors de la vérification du job PowerShell ${jobId}:`, error.message);
+        console.error(`Error checking PowerShell job ${jobId}:`, error.message);
         throw error;
     }
 }
@@ -634,7 +632,7 @@ function getAITools(currentCapture, updateClientCallback) {
             execute: async ({ text, attachments }) => {
                 console.log("Sending notification to user:", text);
 
-                // Créer un objet notification
+                // Create a notification object
                 const notification = {
                     text: text,
                     timestamp: Date.now(),
@@ -642,7 +640,7 @@ function getAITools(currentCapture, updateClientCallback) {
                     attachments: attachments || []
                 };
 
-                // Envoyer la notification au client
+                // Send notification to the client
                 if (updateClientCallback) {
                     const notificationAction = {
                         text: text,
@@ -679,7 +677,7 @@ function getAITools(currentCapture, updateClientCallback) {
                 console.log("Asking user:", text);
                 isWaitingForUserResponse = true;
 
-                // Créer un objet question
+                // Create a question object
                 const question = {
                     text: text,
                     timestamp: Date.now(),
@@ -687,7 +685,7 @@ function getAITools(currentCapture, updateClientCallback) {
                     attachments: attachments || []
                 };
 
-                // Envoyer la question au client
+                // Send the question to the client
                 if (updateClientCallback) {
                     const questionAction = {
                         text: text,
@@ -744,7 +742,7 @@ function getAITools(currentCapture, updateClientCallback) {
             execute: async ({ command, reasoning, action_description, save_information }) => {
                 console.log("Executing PowerShell command:", command);
 
-                // Créer un objet action initial sans end_time
+                // Create an initial action object without end_time
                 const initialAction = {
                     text: action_description,
                     start_time: Date.now(),
@@ -764,18 +762,18 @@ function getAITools(currentCapture, updateClientCallback) {
                     }
                 };
 
-                // Envoyer la mise à jour initiale au client
+                // Send the initial update to the client
                 if (updateClientCallback) {
                     updateClientCallback(initialAction);
                 }
 
                 try {
-                    // Exécuter la commande
+                    // Execute the command
                     const result = await sendPowershellCommand(command);
 
-                    // Vérifier si c'est une tâche longue
+                    // Check if it's a long-running task
                     if (result.is_long_running) {
-                        // Mettre à jour l'action avec les informations de tâche longue
+                        // Update the action with long-running task information
                         const longRunningAction = {
                             ...initialAction,
                             metadata: {
@@ -791,7 +789,7 @@ function getAITools(currentCapture, updateClientCallback) {
                             }
                         };
 
-                        // Envoyer la mise à jour au client
+                        // Send the update to the client
                         if (updateClientCallback) {
                             updateClientCallback(longRunningAction);
                         }
@@ -806,11 +804,11 @@ function getAITools(currentCapture, updateClientCallback) {
                         };
                     }
 
-                    // Si c'est une commande standard terminée, procéder comme avant
-                    // Ajout d'un délai après l'exécution de la commande PowerShell
+                    // If it's a standard command that finished, proceed as before
+                    // Add a delay after executing the PowerShell command
                     await new Promise((resolve) => setTimeout(resolve, CONFIG.DELAYS.ACTION_MS));
 
-                    // Mettre à jour l'action avec les résultats et end_time
+                    // Update the action with results and end_time
                     const finalAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -825,7 +823,7 @@ function getAITools(currentCapture, updateClientCallback) {
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(finalAction);
                     }
@@ -866,7 +864,7 @@ function getAITools(currentCapture, updateClientCallback) {
             execute: async ({ job_id, reasoning, action_description }) => {
                 console.log(`Checking PowerShell job status for: ${job_id}`);
 
-                // Créer un objet action initial
+                // Create an initial action object
                 const initialAction = {
                     text: action_description,
                     start_time: Date.now(),
@@ -885,17 +883,17 @@ function getAITools(currentCapture, updateClientCallback) {
                     }
                 };
 
-                // Envoyer la mise à jour initiale au client
+                // Send the initial update to the client
                 if (updateClientCallback) {
                     updateClientCallback(initialAction);
                 }
 
                 try {
-                    // Récupérer le statut du job
+                    // Retrieve the job status
                     const response = await axios.get(`${CONFIG.VNC_SERVER_URL}/powershell_job/${job_id}`);
                     const jobStatus = response.data;
 
-                    // Mettre à jour l'action avec les résultats
+                    // Update the action with the results
                     const finalAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -910,12 +908,12 @@ function getAITools(currentCapture, updateClientCallback) {
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(finalAction);
                     }
 
-                    // Déterminer si le job est terminé
+                    // Determine if the job is finished
                     const isCompleted = jobStatus.status === 'completed' || jobStatus.status === 'error';
 
                     return {
@@ -926,9 +924,9 @@ function getAITools(currentCapture, updateClientCallback) {
                         is_completed: isCompleted
                     };
                 } catch (error) {
-                    console.error(`Erreur lors de la vérification du job PowerShell ${job_id}:`, error);
+                    console.error(`Error checking PowerShell job ${job_id}:`, error);
 
-                    // Mettre à jour l'action avec l'erreur
+                    // Update the action with the error
                     const errorAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -936,19 +934,19 @@ function getAITools(currentCapture, updateClientCallback) {
                             ...initialAction.metadata,
                             toolResult: {
                                 status: 'error',
-                                error: `Erreur lors de la vérification du statut: ${error.message}`
+                                error: `Error checking status: ${error.message}`
                             }
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(errorAction);
                     }
 
                     return {
                         status: 'error',
-                        error: `Erreur lors de la vérification du statut: ${error.message}`,
+                        error: `Error checking status: ${error.message}`,
                         is_completed: false
                     };
                 }
@@ -967,7 +965,7 @@ function getAITools(currentCapture, updateClientCallback) {
             execute: async ({ job_id, input, reasoning, action_description }) => {
                 console.log(`Sending input to PowerShell job ${job_id}: "${input}"`);
 
-                // Créer un objet action initial
+                // Create an initial action object
                 const initialAction = {
                     text: action_description,
                     start_time: Date.now(),
@@ -987,25 +985,25 @@ function getAITools(currentCapture, updateClientCallback) {
                     }
                 };
 
-                // Envoyer la mise à jour initiale au client
+                // Send the initial update to the client
                 if (updateClientCallback) {
                     updateClientCallback(initialAction);
                 }
 
                 try {
-                    // Envoyer l'entrée au job PowerShell
+                    // Send input to the PowerShell job
                     const response = await axios.post(`${CONFIG.VNC_SERVER_URL}/powershell_job/${job_id}/input`, {
                         input: input
                     });
 
-                    // Ajouter un court délai pour laisser le temps au serveur de traiter l'entrée
+                    // Add a short delay to allow the server time to process the input
                     await new Promise((resolve) => setTimeout(resolve, CONFIG.DELAYS.ACTION_MS / 2));
 
-                    // Obtenir le statut mis à jour après avoir envoyé l'entrée
+                    // Get the updated status after sending the input
                     const statusResponse = await axios.get(`${CONFIG.VNC_SERVER_URL}/powershell_job/${job_id}`);
                     const jobStatus = statusResponse.data;
 
-                    // Mettre à jour l'action avec les résultats
+                    // Update the action with the results
                     const finalAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -1020,7 +1018,7 @@ function getAITools(currentCapture, updateClientCallback) {
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(finalAction);
                     }
@@ -1032,9 +1030,9 @@ function getAITools(currentCapture, updateClientCallback) {
                         current_output: cleanPowerShellOutput(jobStatus.output || "")
                     };
                 } catch (error) {
-                    console.error(`Erreur lors de l'envoi d'entrée au job PowerShell ${job_id}:`, error);
+                    console.error(`Error sending input to PowerShell job ${job_id}:`, error);
 
-                    // Mettre à jour l'action avec l'erreur
+                    // Update the action with the error
                     const errorAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -1042,19 +1040,19 @@ function getAITools(currentCapture, updateClientCallback) {
                             ...initialAction.metadata,
                             toolResult: {
                                 status: 'error',
-                                error: `Erreur lors de l'envoi d'entrée: ${error.message}`
+                                error: `Error sending input: ${error.message}`
                             }
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(errorAction);
                     }
 
                     return {
                         status: 'error',
-                        error: `Erreur lors de l'envoi d'entrée: ${error.message}`
+                        error: `Error sending input: ${error.message}`
                     };
                 }
             },
@@ -1070,7 +1068,7 @@ function getAITools(currentCapture, updateClientCallback) {
             execute: async ({ job_id, reasoning, action_description }) => {
                 console.log(`Terminating PowerShell job: ${job_id}`);
 
-                // Créer un objet action initial
+                // Create an initial action object
                 const initialAction = {
                     text: action_description,
                     start_time: Date.now(),
@@ -1089,28 +1087,28 @@ function getAITools(currentCapture, updateClientCallback) {
                     }
                 };
 
-                // Envoyer la mise à jour initiale au client
+                // Send the initial update to the client
                 if (updateClientCallback) {
                     updateClientCallback(initialAction);
                 }
 
                 try {
-                    // Appeler l'endpoint pour tuer le processus PowerShell
+                    // Call the endpoint to kill the PowerShell process
                     const response = await axios.post(`${CONFIG.VNC_SERVER_URL}/powershell_job/${job_id}/kill`);
 
-                    // Ajouter un court délai après l'action
+                    // Add a short delay after the action
                     await new Promise((resolve) => setTimeout(resolve, CONFIG.DELAYS.ACTION_MS / 2));
 
-                    // Vérifier le statut mis à jour après avoir tué le processus
+                    // Check the updated status after killing the process
                     let jobStatus = null;
                     try {
                         const statusResponse = await axios.get(`${CONFIG.VNC_SERVER_URL}/powershell_job/${job_id}`);
                         jobStatus = statusResponse.data;
                     } catch (statusError) {
-                        console.warn(`Impossible de récupérer le statut du job après sa terminaison: ${statusError.message}`);
+                        console.warn(`Unable to retrieve job status after termination: ${statusError.message}`);
                     }
 
-                    // Mettre à jour l'action avec les résultats
+                    // Update the action with the results
                     const finalAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -1126,7 +1124,7 @@ function getAITools(currentCapture, updateClientCallback) {
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(finalAction);
                     }
@@ -1138,9 +1136,9 @@ function getAITools(currentCapture, updateClientCallback) {
                         job_status: jobStatus ? jobStatus.status : 'unknown'
                     };
                 } catch (error) {
-                    console.error(`Erreur lors de la terminaison du job PowerShell ${job_id}:`, error);
+                    console.error(`Error terminating PowerShell job ${job_id}:`, error);
 
-                    // Mettre à jour l'action avec l'erreur
+                    // Update the action with the error
                     const errorAction = {
                         ...initialAction,
                         end_time: Date.now(),
@@ -1148,19 +1146,19 @@ function getAITools(currentCapture, updateClientCallback) {
                             ...initialAction.metadata,
                             toolResult: {
                                 status: 'error',
-                                error: `Erreur lors de la terminaison du processus: ${error.message}`
+                                error: `Error terminating process: ${error.message}`
                             }
                         }
                     };
 
-                    // Envoyer la mise à jour finale au client
+                    // Send the final update to the client
                     if (updateClientCallback) {
                         updateClientCallback(errorAction);
                     }
 
                     return {
                         status: 'error',
-                        error: `Erreur lors de la terminaison du processus: ${error.message}`
+                        error: `Error terminating process: ${error.message}`
                     };
                 }
             },
@@ -2288,7 +2286,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
     while (retryCount < maxRetries) {
         try {
             if (isFinalResponse) {
-                // Pour la réponse finale, on génère du texte sans outils
+                // For the final response, generate text without tools
                 const { text, usage } = await generateText({
                     model,
                     messages: [
@@ -2299,7 +2297,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
                         ...messages,
                         {
                             role: "user",
-                            content: "<system_message>Your task is completed. You can now speak with the user, the user do not see the tools you have used and the results of the actions you have performed. You need to provide a final answer to the initialuser message.</system_message>"
+                            content: "<system_message>Your task is completed. You can now speak with the user, the user do not see the tools you have used and the results of the actions you have performed. You need to provide a final answer to the initial user message.</system_message>"
                         }
                     ],
                     temperature: CONFIG.TEMPERATURE,
@@ -2307,7 +2305,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
                 });
 
                 const priceDetails = calculateRequestPrice(usage, modelName);
-                console.log("Usage et prix de la requête finale:", {
+                console.log("Usage and price of the final request:", {
                     ...priceDetails,
                     details: `Prompt: $${formatPrice(priceDetails.promptPrice)} | Completion: $${formatPrice(
                         priceDetails.completionPrice
@@ -2316,7 +2314,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
 
                 return { text, usage };
             } else {
-                // Pour les actions, on utilise les outils
+                // For actions, use tools
                 const tools = currentCapture ? getAITools(currentCapture, updateClientCallback) : {};
 
                 const response = await generateText({
@@ -2329,7 +2327,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
                         ...messages,
                     ],
                     tools: tools,
-                    toolChoice: 'required', // Force l'utilisation d'un outil
+                    toolChoice: 'required', // Force tool usage
                     temperature: CONFIG.TEMPERATURE,
                     providerOptions: providerOptions ? providerOptions : undefined
                 });
@@ -2337,7 +2335,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
                 const { text, toolCalls, toolResults, usage } = response;
 
                 const priceDetails = calculateRequestPrice(usage, modelName);
-                console.log("Usage et prix de la requête d'action:", {
+                console.log("Usage and price of the action request:", {
                     ...priceDetails,
                     details: `Prompt: $${formatPrice(priceDetails.promptPrice)} | Completion: $${formatPrice(
                         priceDetails.completionPrice
@@ -2353,7 +2351,7 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
                 };
             }
         } catch (error) {
-            // Vérifier si c'est une erreur de quota
+            // Check for quota errors
             const isQuotaError =
                 error.statusCode === 429 ||
                 (error.data?.error?.status === "RESOURCE_EXHAUSTED") ||
@@ -2362,24 +2360,24 @@ async function getAIResponse(messages, currentCapture = null, isFinalResponse = 
             if (isQuotaError) {
                 retryCount++;
                 if (retryCount < maxRetries) {
-                    console.log(`Quota dépassé. Attente de 60 secondes avant nouvel essai (tentative ${retryCount}/${maxRetries})...`);
-                    await new Promise(resolve => setTimeout(resolve, 60000)); // 60 secondes
+                    console.log(`Quota exceeded. Waiting 60 seconds before retrying (attempt ${retryCount}/${maxRetries})...`);
+                    await new Promise(resolve => setTimeout(resolve, 60000)); // 60 seconds
                     continue;
                 }
             }
 
-            // Si ce n'est pas une erreur de quota ou si on a dépassé le nombre de tentatives
-            console.error("Erreur lors de la génération de texte via AI :", error);
+            // If not a quota error or retries exceeded
+            console.error("Error generating text via AI:", error);
             throw error;
         }
     }
 }
 
-// Fonction utilitaire pour construire les contenus des messages
+// Utility function to build message contents
 async function buildMessageContents(userInput, currentCapture) {
     const messageContents = [];
 
-    // Construit la chaîne d'informations sur l'écran
+    // Builds the screen information string
     let screen_info = "";
     currentCapture.parsedData.parsed_content_list.forEach((element, idx) => {
         if (element['type'] == 'text') {
@@ -2389,7 +2387,7 @@ async function buildMessageContents(userInput, currentCapture) {
         }
     });
 
-    // Ajoute les captures d'écran
+    // Adds screenshots
     if (CONFIG.SEND_SCREENSHOT) {
         if (CONFIG.CONVERT_SCREENSHOT_TO_DESCRIPTION) {
             const screenshotDescription = await getScreenshotDescription(currentCapture.screenshotData.base64Image);
@@ -2405,7 +2403,7 @@ async function buildMessageContents(userInput, currentCapture) {
         }
     }
 
-    // Ajoute les captures d'écran analysées
+    // Adds parsed screenshots
     if (CONFIG.SEND_PARSED_SCREENSHOT) {
         if (CONFIG.CONVERT_SCREENSHOT_TO_DESCRIPTION) {
             const parsedScreenshotDescription = await getScreenshotDescription(currentCapture.parsedData.som_image_base64);
@@ -2421,13 +2419,13 @@ async function buildMessageContents(userInput, currentCapture) {
         }
     }
 
-    // Ajoute les informations sur l'écran
+    // Adds screen information
     messageContents.push({
         type: "text",
         text: `<screen_info>\n${screen_info}\n</screen_info>`,
     });
 
-    // Ajoute l'interaction utilisateur si fournie
+    // Adds user interaction if provided
     if (userInput) {
         messageContents.push({
             type: "text",
@@ -2435,7 +2433,7 @@ async function buildMessageContents(userInput, currentCapture) {
         });
     }
 
-    // Ajoute les informations sur le mode de secours si nécessaire
+    // Adds fallback mode information if necessary
     if (isInFallbackMode) {
         messageContents.push({
             type: "text",
@@ -2447,16 +2445,16 @@ async function buildMessageContents(userInput, currentCapture) {
 }
 
 function getBoxCoordinates(boxId, parsedContentList, imageWidth, imageHeight) {
-    // Recherche de la boîte par son ID (index dans la liste)
+    // Search for the box by its ID (index in the list)
     const box = parsedContentList.find((_, index) => index === boxId);
     if (!box) {
         throw new Error(
-            `Impossible de trouver la box ID ${boxId} dans une liste de longueur ${parsedContentList.length}.`
+            `Cannot find box ID ${boxId} in a list of length ${parsedContentList.length}.`
         );
     }
 
-    // bbox contient [x1, y1, x2, y2] en pourcentage de l'image
-    // On calcule les coordonnées du centre de la boîte en pixels
+    // bbox contains [x1, y1, x2, y2] as percentages of the image
+    // We calculate the coordinates of the center of the box in pixels
     const x = Math.round(
         box.bbox[0] * imageWidth + ((box.bbox[2] - box.bbox[0]) * imageWidth) / 2
     );
@@ -2487,7 +2485,7 @@ function convertActionToPyAutoGUI(action, coordinates, value = null) {
     switch (action.toLowerCase()) {
         case "type": {
             if (!value) {
-                throw new Error("L'action 'type' requiert une 'value'.");
+                throw new Error("The 'type' action requires a 'value'.");
             }
             const escapedValue = escapeString(value);
             if (!coordinates) {
@@ -2503,7 +2501,7 @@ function convertActionToPyAutoGUI(action, coordinates, value = null) {
         }
         case "type_no_enter": {
             if (!value) {
-                throw new Error("L'action 'type_no_enter' requiert une 'value'.");
+                throw new Error("The 'type_no_enter' action requires a 'value'.");
             }
             const escapedValue = escapeString(value);
             if (!coordinates) {
@@ -2518,7 +2516,7 @@ function convertActionToPyAutoGUI(action, coordinates, value = null) {
         }
         case "key": {
             if (!value) {
-                throw new Error("L'action 'key' requiert une 'value' (touche ou combinaison).");
+                throw new Error("The 'key' action requires a 'value' (key or combination).");
             }
             const keys = value.split("+").map((k) => k.trim().toLowerCase());
             const keyDown = keys.map((k) => `pyautogui.keyDown('${k}')`).join("; ");
@@ -2527,33 +2525,33 @@ function convertActionToPyAutoGUI(action, coordinates, value = null) {
         }
         case "left_click": {
             if (!coordinates) {
-                throw new Error("L'action 'left_click' requiert une 'box_id'.");
+                throw new Error("The 'left_click' action requires a 'box_id'.");
             }
             return `${baseCmd} pyautogui.click(x=${coordinates.x}, y=${coordinates.y})`;
         }
         case "right_click": {
             if (!coordinates) {
-                throw new Error("L'action 'right_click' requiert une 'box_id'.");
+                throw new Error("The 'right_click' action requires a 'box_id'.");
             }
             return `${baseCmd} pyautogui.rightClick(x=${coordinates.x}, y=${coordinates.y})`;
         }
         case "double_click": {
             if (!coordinates) {
-                throw new Error("L'action 'double_click' requiert une 'box_id'.");
+                throw new Error("The 'double_click' action requires a 'box_id'.");
             }
             return `${baseCmd} pyautogui.doubleClick(x=${coordinates.x}, y=${coordinates.y})`;
         }
         case "middle_click": {
             if (!coordinates) {
-                throw new Error("L'action 'middle_click' requiert une 'box_id'.");
+                throw new Error("The 'middle_click' action requires a 'box_id'.");
             }
             return `${baseCmd} pyautogui.middleClick(x=${coordinates.x}, y=${coordinates.y})`;
         }
         case "hover": {
             if (!coordinates) {
-                throw new Error("L'action 'hover' requiert une 'box_id'.");
+                throw new Error("The 'hover' action requires a 'box_id'.");
             }
-            // Pour hover, on garde un léger délai pour un mouvement fluide
+            // For hover, we keep a slight delay for smooth movement
             return `${baseCmd} pyautogui.moveTo(x=${coordinates.x}, y=${coordinates.y}, duration=0.1)`;
         }
         case "scroll_up": {
@@ -2564,94 +2562,94 @@ function convertActionToPyAutoGUI(action, coordinates, value = null) {
         }
         case "scroll_down_until_text_found": {
             if (!value) {
-                throw new Error("L'action 'scroll_down_until_text_found' requiert une 'value' (texte à chercher).");
+                throw new Error("The 'scroll_down_until_text_found' action requires a 'value' (text to search for).");
             }
             return `${baseCmd} pyautogui.scroll(-${CONFIG.SCROLL.AMOUNT});`;
         }
         case "scroll_up_until_text_found": {
             if (!value) {
-                throw new Error("L'action 'scroll_up_until_text_found' requiert une 'value' (texte à chercher).");
+                throw new Error("The 'scroll_up_until_text_found' action requires a 'value' (text to search for).");
             }
             return `${baseCmd} pyautogui.scroll(${CONFIG.SCROLL.AMOUNT});`;
         }
         case "left_click_drag": {
             if (!coordinates) {
-                throw new Error("L'action 'left_click_drag' requiert une 'box_id'.");
+                throw new Error("The 'left_click_drag' action requires a 'box_id'.");
             }
-            // Pour le drag, on doit spécifier les coordonnées de début et de fin
-            // Comme on n'a que les coordonnées de destination, on utilise la position actuelle comme départ
+            // For drag, we must specify the start and end coordinates
+            // Since we only have the destination coordinates, we use the current position as the start
             return `${baseCmd} pyautogui.dragTo(x=${coordinates.x}, y=${coordinates.y}, duration=${CONFIG.DRAG_DURATION_SECONDS})`;
         }
         default: {
-            throw new Error(`Action non supportée : ${action}`);
+            throw new Error(`Unsupported action: ${action}`);
         }
     }
 }
 
 async function sendPowershellCommand(command) {
     try {
-        // 1. Envoyer la commande PowerShell
+        // 1. Send the PowerShell command
         const response = await axios.post(`${CONFIG.VNC_SERVER_URL}/execute_powershell`, {
             command: command,
         });
 
-        // Vérifier si la requête a réussi
+        // Check if the request was successful
         if (response.data.status !== 'success' || !response.data.job_id) {
-            console.error("Erreur lors de l'exécution de la commande PowerShell:", response.data);
+            console.error("Error executing the PowerShell command:", response.data);
             return {
                 output: "",
-                error: "Erreur lors de l'exécution de la commande PowerShell",
+                error: "Error executing the PowerShell command",
                 returncode: 1
             };
         }
 
-        // 2. Récupérer le job_id
+        // 2. Retrieve the job_id
         const jobId = response.data.job_id;
-        console.log(`Commande PowerShell démarrée avec job_id: ${jobId}`);
+        console.log(`PowerShell command started with job_id: ${jobId}`);
 
-        // 3. Vérifier le statut du job toutes les secondes pendant 30 secondes maximum
+        // 3. Check job status every second for a maximum of 30 seconds
         const MAX_ATTEMPTS = 30;
-        const POLL_INTERVAL = 1000; // 1 seconde
+        const POLL_INTERVAL = 1000; // 1 second
         let jobStatus;
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            // Attendre l'intervalle de polling
+            // Wait for the polling interval
             await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
-            // Récupérer le statut du job
+            // Retrieve the job status
             const statusResponse = await axios.get(`${CONFIG.VNC_SERVER_URL}/powershell_job/${jobId}`);
             jobStatus = statusResponse.data;
 
-            // Si le job est terminé, retourner les résultats
+            // If the job is finished, return the results
             if (jobStatus.status === 'completed' || jobStatus.status === 'error') {
-                console.log(`Job PowerShell ${jobId} terminé avec statut: ${jobStatus.status}`);
+                console.log(`PowerShell job ${jobId} finished with status: ${jobStatus.status}`);
                 return {
                     output: jobStatus.output || "",
                     error: jobStatus.error || null,
                     returncode: jobStatus.returncode || 0,
-                    screen_recording_job_id: null // Pas de vidéo pour les commandes PowerShell
+                    screen_recording_job_id: null // No video for PowerShell commands
                 };
             }
 
-            console.log(`Job PowerShell ${jobId} en cours (tentative ${attempt + 1}/${MAX_ATTEMPTS})...`);
+            console.log(`PowerShell job ${jobId} in progress (attempt ${attempt + 1}/${MAX_ATTEMPTS})...`);
         }
 
-        // 4. Si le job n'est pas terminé après 30 secondes, retourner le job_id et le status
-        console.log(`Job PowerShell ${jobId} non terminé après ${MAX_ATTEMPTS} secondes, retour du statut partiel`);
+        // 4. If the job is not finished after 30 seconds, return the job_id and status
+        console.log(`PowerShell job ${jobId} not finished after ${MAX_ATTEMPTS} seconds, returning partial status`);
         return {
-            output: `Commande en cours d'exécution (job_id: ${jobId})...`,
+            output: `Command running (job_id: ${jobId})...`,
             error: null,
             returncode: null,
             job_id: jobId,
             status: 'running',
-            is_long_running: true, // Indiquer que c'est une tâche longue
+            is_long_running: true, // Indicate that it's a long-running task
             current_output: jobStatus.output || "",
             current_error: jobStatus.error || ""
         };
     } catch (error) {
-        console.error("Erreur lors de l'appel à /execute_powershell :", error);
+        console.error("Error calling /execute_powershell:", error);
         return {
             output: "",
-            error: `Erreur lors de l'exécution de la commande PowerShell: ${error.message}`,
+            error: `Error executing the PowerShell command: ${error.message}`,
             returncode: 1
         };
     }
@@ -2664,25 +2662,25 @@ async function sendCommandToVM(pythonCode) {
         });
         return response.data;
     } catch (error) {
-        console.error("Erreur lors de l'envoi de la commande à la VM :", error);
+        console.error("Error sending command to VM:", error);
         return {};
     }
 }
 
-// Fonction pour convertir un screenshot en description avec cache
+// Function to convert a screenshot to description with cache
 async function getScreenshotDescription(base64Image) {
-    // Vérifier si la description est déjà en cache
+    // Check if the description is already cached
     if (screenshotDescriptionCache.has(base64Image)) {
         return screenshotDescriptionCache.get(base64Image);
     }
 
-    // Si pas en cache, convertir le screenshot
+    // If not cached, convert the screenshot
     const description = await convertScreenshotToDescription(base64Image);
 
-    // Mettre en cache la description
+    // Cache the description
     screenshotDescriptionCache.set(base64Image, description);
 
-    // Limiter la taille du cache (garder les 100 dernières descriptions)
+    // Limit cache size (keep the last 100 descriptions)
     if (screenshotDescriptionCache.size > 100) {
         const firstKey = screenshotDescriptionCache.keys().next().value;
         screenshotDescriptionCache.delete(firstKey);
@@ -2699,20 +2697,20 @@ async function captureAndParseScreenshot() {
         try {
             isInFallbackMode = false;
             const screenshotData = await getScreenshotFromVNC();
-            console.log(`→ Capture d'écran récupérée avec succès (tentative ${attempt}/${MAX_RETRIES}).`);
+            console.log(`→ Screenshot successfully retrieved (attempt ${attempt}/${MAX_RETRIES}).`);
 
             try {
                 const parsedData = await parseScreenshot(screenshotData.base64Image);
-                console.log("→ Image analysée avec succès.");
+                console.log("→ Image successfully parsed.");
                 return {
                     screenshotData,
                     parsedData,
                 };
             } catch (parseError) {
                 if (parseError?.response?.status === 500) {
-                    console.log(`→ Erreur 500 lors du parsing (tentative ${attempt}/${MAX_RETRIES}). L'écran est peut-être noir ou sans éléments visibles.`);
+                    console.log(`→ 500 error during parsing (attempt ${attempt}/${MAX_RETRIES}). The screen might be black or have no visible elements.`);
                     if (attempt === MAX_RETRIES) {
-                        throw new Error(`Échec du parsing après ${MAX_RETRIES} tentatives. L'écran est peut-être noir ou sans éléments visibles.`);
+                        throw new Error(`Parsing failed after ${MAX_RETRIES} attempts. The screen might be black or have no visible elements.`);
                     }
                     // Wait before next attempt
                     await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -2725,15 +2723,15 @@ async function captureAndParseScreenshot() {
             if (attempt === MAX_RETRIES) {
                 throw error;
             }
-            console.log(`→ Erreur lors de la capture d'écran (tentative ${attempt}/${MAX_RETRIES}). Nouvelle tentative dans ${RETRY_DELAY / 1000} secondes.`);
+            console.log(`→ Error capturing screenshot (attempt ${attempt}/${MAX_RETRIES}). Retrying in ${RETRY_DELAY / 1000} seconds.`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         }
     }
 }
 
 /**
- * Nettoie l'historique pour éviter d'envoyer trop d'images sur l'API
- * (on ne conserve qu'un certain nombre d'images).
+ * Cleans up history to avoid sending too many images to the API
+ * (only a certain number of images are kept).
  */
 function cleanupOldMessageImages(messages) {
     let cleanedMessages = [...messages];
@@ -2746,7 +2744,7 @@ function cleanupOldMessageImages(messages) {
         return acc;
     }, []);
 
-    // Trouve tous les indices des messages contenant screen_info
+    // Find all indices of messages containing screen_info
     const screenInfoIndices = cleanedMessages.reduce((acc, msg, idx) => {
         if (msg.role === "user" && Array.isArray(msg.content)) {
             const hasScreenInfo = msg.content.some(
@@ -2757,16 +2755,16 @@ function cleanupOldMessageImages(messages) {
         return acc;
     }, []);
 
-    // Trouve tous les indices des messages assistant
+    // Find all indices of assistant messages
     const assistantIndices = cleanedMessages.reduce((acc, msg, idx) => {
         if (msg.role === "assistant") acc.push(idx);
         return acc;
     }, []);
 
-    // Garde uniquement les N derniers screen_info
+    // Keep only the last N screen_info
     const screenInfoToKeep = screenInfoIndices.slice(-CONFIG.MAX_SCREEN_INFO_IN_HISTORY);
 
-    // Garde uniquement les N derniers messages assistant pour situation_analysis
+    // Keep only the last N assistant messages for situation_analysis
     const assistantToKeep = assistantIndices.slice(-CONFIG.MAX_SITUATION_ANALYSIS_IN_HISTORY);
 
     cleanedMessages.forEach((message, index) => {
@@ -2787,7 +2785,7 @@ function cleanupOldMessageImages(messages) {
         });
     }
 
-    // Vérifier si on a des messages user avec un content vide, si oui on les supprime
+    // Check if there are user messages with empty content, if so delete them
     cleanedMessages = cleanedMessages.filter((message) => {
         if (message.role === "user" && message.content.length === 0) {
             return false;
@@ -2798,11 +2796,11 @@ function cleanupOldMessageImages(messages) {
     return cleanedMessages;
 }
 
-// Fonction pour récupérer et sauvegarder la vidéo de manière asynchrone
+// Function to fetch and save the video asynchronously
 async function fetchAndSaveScreenRecording(jobId, currentAction) {
     try {
-        const maxAttempts = 30; // Maximum 30 tentatives
-        const delayBetweenAttempts = 1000; // 1 seconde entre chaque tentative
+        const maxAttempts = 30; // Maximum 30 attempts
+        const delayBetweenAttempts = 1000; // 1 second between each attempt
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const response = await axios.get(`http://localhost:5000/job/${jobId}`, { timeout: 10000 });
@@ -2812,25 +2810,25 @@ async function fetchAndSaveScreenRecording(jobId, currentAction) {
                 currentAction.metadata.screen_recording_base64 = `data:video/mp4;base64,${jobData.screen_recording}`;
                 break;
             } else if (jobData.status === "failed") {
-                console.error(`Échec de la récupération de la vidéo pour le job ${jobId}`);
+                console.error(`Failed to retrieve video for job ${jobId}`);
                 break;
             }
 
-            // Attendre avant la prochaine tentative
+            // Wait before the next attempt
             await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
         }
     } catch (error) {
-        console.error(`Erreur lors de la récupération/sauvegarde de la vidéo (job ${jobId}):`, error.message);
+        console.error(`Error fetching/saving video (job ${jobId}):`, error.message);
     }
 }
 
-// -- Nouveau endpoint SSE -----------------------------------------------------
+// -- New SSE endpoint -----------------------------------------------------
 //
-// On utilise GET /send_message?message=xxxx
-// pour simplifier l'utilisation de SSE (EventSource) côté client.
+// We use GET /send_message?message=xxxx
+// to simplify the use of SSE (EventSource) on the client side.
 //
 app.get("/send_message", async (req, res) => {
-    // Configuration SSE
+    // SSE Configuration
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -2856,8 +2854,8 @@ app.get("/send_message", async (req, res) => {
     consecutiveWaitCount = 0;
 
     try {
-        console.log("Démarrage du processus d'automatisation...");
-        // Réinitialise le tracking de coûts pour cette session
+        console.log("Starting automation process...");
+        // Resets cost tracking for this session
         totalRequestPrice = {
             promptPrice: 0,
             completionPrice: 0,
@@ -2867,7 +2865,7 @@ app.get("/send_message", async (req, res) => {
             totalTokens: 0,
         };
 
-        // 1) On crée un message utilisateur (avec un ID)
+        // 1) Create a user message (with an ID)
         const userMessageId = uuidv4();
         const userMessage = {
             id: userMessageId,
@@ -2878,7 +2876,7 @@ app.get("/send_message", async (req, res) => {
         clientHistory.push(userMessage);
         res.write(`event: message\ndata: ${JSON.stringify(userMessage)}\n\n`);
 
-        // 2) On prépare un message assistant
+        // 2) Prepare an assistant message
         const assistantMessageId = uuidv4();
         const assistantMessage = {
             id: assistantMessageId,
@@ -2896,11 +2894,11 @@ app.get("/send_message", async (req, res) => {
         clientHistory.push(assistantMessage);
         saveClientHistory();
 
-        // 3) Capture et parsing initiaux
+        // 3) Initial capture and parsing
         let currentCapture = await captureAndParseScreenshot();
 
-        // 4) Construction des messages pour l'IA
-        let messages = [...globalMessages]; // On commence avec l'historique existant
+        // 4) Building messages for the AI
+        let messages = [...globalMessages]; // Start with the existing history
         messages.push({
             role: "user",
             content: await buildMessageContents(userInput, currentCapture)
@@ -2910,29 +2908,29 @@ app.get("/send_message", async (req, res) => {
         isTaskDone = false;
         isWaitingForUserResponse = false;
 
-        // Fonction de callback pour mettre à jour le client en temps réel
+        // Callback function to update the client in real time
         const updateClientWithAction = (action) => {
             if (!requestTracker.stopRequested && requestTracker.res) {
-                // Ajouter l'action à la liste ou mettre à jour si elle existe déjà
+                // Add the action to the list or update if it already exists
                 const actionIndex = assistantMessage.actions.list_of_actions.findIndex(
                     a => a.start_time === action.start_time && a.action_type === action.action_type
                 );
 
                 if (actionIndex === -1) {
-                    // Nouvelle action
+                    // New action
                     assistantMessage.actions.list_of_actions.push(action);
                 } else {
-                    // Mise à jour d'une action existante
+                    // Update an existing action
                     assistantMessage.actions.list_of_actions[actionIndex] = action;
                 }
 
-                // Envoyer la mise à jour au client
+                // Send the update to the client
                 requestTracker.res.write(`event: message\ndata: ${JSON.stringify(assistantMessage)}\n\n`);
                 saveClientHistory();
             }
         };
 
-        // 5) Boucle d'actions de l'IA
+        // 5) AI action loop
         while (!isTaskDone && !isWaitingForUserResponse) {
             // Clean up message history
             const cleanedMessagesForAPI = cleanupOldMessageImages(messages);
@@ -2946,7 +2944,7 @@ app.get("/send_message", async (req, res) => {
             } = await getAIResponse(cleanedMessagesForAPI, currentCapture, false, updateClientWithAction);
 
 
-            // Add the response messages to message history
+            // Add response messages to history
             messages.push(...response.response.messages);
             globalMessages = [...messages];
             saveMessagesHistory();
@@ -2966,7 +2964,7 @@ app.get("/send_message", async (req, res) => {
                 assistantMessage.actions.end_time = Date.now();
                 res.write(`event: message\ndata: ${JSON.stringify(assistantMessage)}\n\n`);
 
-                // Get final response text
+                // Get the final response text
                 const { text: finalText, usage: finalUsage } = await getAIResponse(cleanedMessagesForAPI, null, true);
                 console.log("Final AI response:", finalText);
 
@@ -2986,7 +2984,7 @@ app.get("/send_message", async (req, res) => {
                     consecutiveWaitCount++;
                     console.log(`Consecutive wait count: ${consecutiveWaitCount}`);
 
-                    // Add warning after 3 consecutive waits
+                    // Add a warning after 3 consecutive waits
                     if (consecutiveWaitCount >= 3 && !isInFallbackMode) {
                         messages.push({
                             role: "user",
@@ -3004,10 +3002,8 @@ app.get("/send_message", async (req, res) => {
                     // Reset counter for non-wait actions
                     consecutiveWaitCount = 0;
                 }
-
-
             }
-            
+
             if (!have_tool_calls) {
                 // If no tool calls, we need to send a warning to the assistant. It's not allowed to not use any tool.
                 messages.push({
@@ -3024,7 +3020,7 @@ app.get("/send_message", async (req, res) => {
             }
 
 
-            // If not task_done, capture new screenshot for next iteration
+            // If the task is not done, capture a new screenshot for the next iteration
             if (!isTaskDone) {
                 currentCapture = await captureAndParseScreenshot();
                 messages.push({
@@ -3047,31 +3043,31 @@ app.get("/send_message", async (req, res) => {
         }
 
         // Log cost summary
-        console.log("→ Processus terminé.");
-        console.log("\nRécapitulatif des coûts :");
+        console.log("→ Process finished.");
+        console.log("\nCost summary:");
         console.log(
-            `Total tokens utilisés: ${totalRequestPrice.totalTokens} (${totalRequestPrice.promptTokens} prompt + ${totalRequestPrice.completionTokens} completion)`
+            `Total tokens used: ${totalRequestPrice.totalTokens} (${totalRequestPrice.promptTokens} prompt + ${totalRequestPrice.completionTokens} completion)`
         );
         console.log(
-            `Prix total: $${formatPrice(totalRequestPrice.totalPrice)} (Prompt: $${formatPrice(
+            `Total price: $${formatPrice(totalRequestPrice.totalPrice)} (Prompt: $${formatPrice(
                 totalRequestPrice.promptPrice
             )} + Completion: $${formatPrice(totalRequestPrice.completionPrice)})`
         );
         console.log(
-            `Prix moyen par 1K tokens: $${formatPrice(
+            `Average price per 1K tokens: $${formatPrice(
                 (totalRequestPrice.totalPrice / totalRequestPrice.totalTokens) * 1000
             )}`
         );
 
-        // Cleanup the request tracker
+        // Clean up the request tracker
         activeRequests.delete(requestId);
 
         // Close the SSE stream
         res.end();
     } catch (error) {
-        // Cleanup the request tracker in case of error
+        // Clean up the request tracker in case of error
         activeRequests.delete(requestId);
-        console.error("Erreur globale:", error.message);
+        console.error("Global error:", error.message);
         res.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();
     }
@@ -3096,7 +3092,7 @@ app.post("/stop_request", (req, res) => {
     res.json({ status: "success", message: "Stop request received" });
 });
 
-// -- Endpoint d'historique inchangé -------------------------------------------
+// -- Unchanged History Endpoint -------------------------------------------
 app.get("/history", (req, res) => {
     try {
         res.json(clientHistory);
@@ -3108,7 +3104,7 @@ app.get("/history", (req, res) => {
 
 // -- Settings API Endpoints --------------------------------------------------
 
-// GET /settings - Récupérer les paramètres actuels
+// GET /settings - Retrieve current settings
 app.get("/settings", (req, res) => {
     try {
         const editableSettings = {};
@@ -3118,20 +3114,20 @@ app.get("/settings", (req, res) => {
 
         res.json(editableSettings);
     } catch (error) {
-        console.error("Erreur lors de la récupération des paramètres:", error);
-        res.status(500).json({ error: "Erreur serveur lors de la récupération des paramètres" });
+        console.error("Error retrieving settings:", error);
+        res.status(500).json({ error: "Server error retrieving settings" });
     }
 });
 
-// POST /settings - Mettre à jour les paramètres
+// POST /settings - Update settings
 app.post("/settings", (req, res) => {
     try {
         const newSettings = req.body;
 
-        // Valide et met à jour uniquement les paramètres autorisés
+        // Validates and updates only allowed settings
         EDITABLE_SETTINGS.forEach(key => {
             if (newSettings[key] !== undefined) {
-                // Conversion de type si nécessaire
+                // Type conversion if necessary
                 if (typeof CONFIG[key] === 'boolean') {
                     CONFIG[key] = Boolean(newSettings[key]);
                 } else if (typeof CONFIG[key] === 'number') {
@@ -3142,13 +3138,13 @@ app.post("/settings", (req, res) => {
             }
         });
 
-        // Sauvegarde les paramètres mis à jour
+        // Saves updated settings
         saveSettings();
 
-        res.json({ success: true, message: "Paramètres mis à jour avec succès" });
+        res.json({ success: true, message: "Settings updated successfully" });
     } catch (error) {
-        console.error("Erreur lors de la mise à jour des paramètres:", error);
-        res.status(500).json({ error: "Erreur serveur lors de la mise à jour des paramètres" });
+        console.error("Error updating settings:", error);
+        res.status(500).json({ error: "Server error updating settings" });
     }
 });
 
@@ -3172,9 +3168,9 @@ app.post("/reset_data", (req, res) => {
         };
 
         // Remove history files
-        const filestoDelete = [CONFIG.CLIENT_HISTORY_FILE_PATH, CONFIG.MESSAGES_HISTORY_FILE_PATH];
+        const filesToDelete = [CONFIG.CLIENT_HISTORY_FILE_PATH, CONFIG.MESSAGES_HISTORY_FILE_PATH];
 
-        filestoDelete.forEach(filePath => {
+        filesToDelete.forEach(filePath => {
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
                 console.log(`Deleted file: ${filePath}`);
@@ -3188,10 +3184,10 @@ app.post("/reset_data", (req, res) => {
 
         console.log("All data has been reset successfully");
 
-        res.json({ success: true, message: "Toutes les données ont été supprimées avec succès" });
+        res.json({ success: true, message: "All data has been deleted successfully" });
     } catch (error) {
-        console.error("Error resetting data:", error);
-        res.status(500).json({ error: "Erreur lors de la suppression des données" });
+        console.error("Error deleting data:", error);
+        res.status(500).json({ error: "Error deleting data" });
     }
 });
 
@@ -3203,7 +3199,7 @@ app.get('/', (req, res) => {
 });
 
 
-// -- Lancement du serveur -----------------------------------------------------
+// -- Starting the server -----------------------------------------------------
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     loadClientHistory();
