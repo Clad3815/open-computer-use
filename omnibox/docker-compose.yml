@@ -1,5 +1,6 @@
 services:
   windows:
+    build: .
     image: windows-local
     container_name: omni-windows
     privileged: true
