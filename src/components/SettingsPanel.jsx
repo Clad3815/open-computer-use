@@ -22,16 +22,20 @@ const SettingsPanel = ({ isOpen, onClose, isGenerating }) => {
 
   // List of available models
   const availableModels = [
-    { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-    { value: "google/gemini-2.5-pro-exp-03-25", label: "Gemini 2.5 Pro (Experimental 03/25)" },
-    { value: "google/gemini-2.0-pro-exp-02-05", label: "Gemini 2.0 Pro (Experimental 02/05)" },
+    { value: "google/gemini-2.5-flash", label: "Gemini 2.0 Flash" },
+    { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
     { value: "openai/gpt-4o", label: "GPT-4o" },
-    { value: "openai/o1", label: "o1" },
+    { value: "openai/gpt-4.1", label: "GPT-4.1" },
+    { value: "openai/o3", label: "o3" },
+    { value: "openai/o3-low", label: "o3-low" },
+    { value: "openai/o3-high", label: "o3-high" },
     { value: "openai/o3-mini", label: "o3-mini" },
     { value: "openai/o3-mini-low", label: "o3-mini-low" },
     { value: "openai/o3-mini-high", label: "o3-mini-high" },
-    { value: "anthropic/claude-3-7-sonnet-latest", label: "Claude 3.7 Sonnet" },
-    { value: "anthropic/claude-3-7-sonnet-latest-thinking", label: "Claude 3.7 Sonnet Thinking" },
+    { value: "openai/o4-mini", label: "o4-mini" },
+    { value: "openai/o4-mini-low", label: "o4-mini-low" },
+    { value: "openai/o4-mini-high", label: "o4-mini-high" },
+
   ];
 
   // Navigation sections

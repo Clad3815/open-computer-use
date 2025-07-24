@@ -76,13 +76,29 @@ const CONFIG = {
             PROMPT: 0.10,
             COMPLETION: 0.40,
         },
+        "gemini-2.5-flash": {
+            PROMPT: 0.3,
+            COMPLETION: 2.5,
+        },
+        "gemini-2.5-pro": {
+            PROMPT: 1.25,
+            COMPLETION: 10,
+        },
         "gpt-4o": {
             PROMPT: 2.5,
             COMPLETION: 10,
         },
+        "gpt-4.1": {
+            PROMPT: 2,
+            COMPLETION: 8,
+        },
         "o3-mini": {
             PROMPT: 1.1,
             COMPLETION: 4.4,
+        },
+        "o3": {
+            PROMPT: 2,
+            COMPLETION: 8,
         },
         "claude-3-7-sonnet-latest": {
             PROMPT: 3,
@@ -505,6 +521,24 @@ function getAIModel(modelString) {
             providerOptions = { reasoningEffort: 'high' };
         } else if (fullModelName.startsWith('o3-mini')) {
             modelName = 'o3-mini';
+            providerOptions = { reasoningEffort: 'medium' };
+        } else if (fullModelName.startsWith('o3-low')) {
+            modelName = 'o3';
+            providerOptions = { reasoningEffort: 'low' };
+        } else if (fullModelName.startsWith('o3-high')) {
+            modelName = 'o3';
+            providerOptions = { reasoningEffort: 'high' };
+        } else if (fullModelName.startsWith('o3')) {
+            modelName = 'o3';
+            providerOptions = { reasoningEffort: 'medium' };
+        } else if (fullModelName.startsWith('o4-mini-low')) {
+            modelName = 'o4-mini';
+            providerOptions = { reasoningEffort: 'low' };
+        } else if (fullModelName.startsWith('o4-mini-high')) {
+            modelName = 'o4-mini';
+            providerOptions = { reasoningEffort: 'high' };
+        } else if (fullModelName.startsWith('o4-mini')) {
+            modelName = 'o4-mini';
             providerOptions = { reasoningEffort: 'medium' };
         }
     } else if (provider.toLowerCase() === 'anthropic') {
@@ -1169,9 +1203,8 @@ function getAITools(currentCapture, updateClientCallback) {
                 situation_analysis: z.string().describe("Analysis of the current situation"),
                 reasoning: z.string().describe("Reasoning behind reading this file"),
                 file: z.string().describe("Absolute path of the file to read"),
-                start_line: z.number().optional().describe("(Optional) Starting line to read from, 0-based"),
-                end_line: z.number().optional().describe("(Optional) Ending line number (exclusive)"),
-                sudo: z.boolean().optional().describe("(Optional) Whether to use sudo privileges"),
+                start_line: z.number().describe("Starting line to read from, 0-based"),
+                end_line: z.number().describe("Ending line number (exclusive)"),
                 action_description: z.string().describe("Description of what this action will do, formatted with markdown")
             }),
             execute: async ({ file, start_line, end_line, sudo, reasoning, action_description }) => {
@@ -1263,10 +1296,9 @@ function getAITools(currentCapture, updateClientCallback) {
                 reasoning: z.string().describe("Reasoning behind writing to this file"),
                 file: z.string().describe("Absolute path of the file to write to"),
                 content: z.string().describe("Text content to write"),
-                append: z.boolean().optional().describe("(Optional) Whether to use append mode (default: false)"),
-                leading_newline: z.boolean().optional().describe("(Optional) Whether to add a leading newline (default: false)"),
-                trailing_newline: z.boolean().optional().describe("(Optional) Whether to add a trailing newline (default: false)"),
-                sudo: z.boolean().optional().describe("(Optional) Whether to use sudo privileges"),
+                append: z.boolean().describe("Whether to use append mode (default: false)"),
+                leading_newline: z.boolean().describe("Whether to add a leading newline (default: false)"),
+                trailing_newline: z.boolean().describe("Whether to add a trailing newline (default: false)"),
                 action_description: z.string().describe("Description of what this action will do, formatted with markdown")
             }),
             execute: async ({ file, content, append, leading_newline, trailing_newline, sudo, reasoning, action_description }) => {
@@ -1363,7 +1395,6 @@ function getAITools(currentCapture, updateClientCallback) {
                 file: z.string().describe("Absolute path of the file to perform replacement on"),
                 old_str: z.string().describe("Original string to be replaced"),
                 new_str: z.string().describe("New string to replace with"),
-                sudo: z.boolean().optional().describe("(Optional) Whether to use sudo privileges"),
                 action_description: z.string().describe("Description of what this action will do, formatted with markdown")
             }),
             execute: async ({ file, old_str, new_str, sudo, reasoning, action_description }) => {
@@ -1455,7 +1486,6 @@ function getAITools(currentCapture, updateClientCallback) {
                 reasoning: z.string().describe("Reasoning behind searching this file"),
                 file: z.string().describe("Absolute path of the file to search within"),
                 regex: z.string().describe("Regular expression pattern to match"),
-                sudo: z.boolean().optional().describe("(Optional) Whether to use sudo privileges"),
                 action_description: z.string().describe("Description of what this action will do, formatted with markdown")
             }),
             execute: async ({ file, regex, sudo, reasoning, action_description }) => {
@@ -1910,7 +1940,7 @@ function getAITools(currentCapture, updateClientCallback) {
                 reasoning: z.string().describe("Reasoning behind the text input"),
                 text: z.string().describe("The text to type"),
                 press_enter: z.boolean().describe("Whether to press Enter after typing (default: true)"),
-                box_id: z.number().nullable().describe("Optional: The ID of a box to click before typing (if needed)"),
+                box_id: z.number().describe("The ID of a box to click before typing (0 if not needed)"),
                 action_description: z.string().describe("Description of what typing will do, formatted with markdown"),
                 save_information: z.boolean().describe("Save the information on the screen in the memory")
             }),

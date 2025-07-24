@@ -1,5 +1,5 @@
 {
-  "AI_MODEL": "google/gemini-2.5-pro-exp-03-25",
+  "AI_MODEL": "openai/gpt-4.1",
   "TEMPERATURE": 1,
   "SEND_SCREENSHOT": true,
   "SEND_PARSED_SCREENSHOT": true,

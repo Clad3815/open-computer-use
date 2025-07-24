@@ -18,6 +18,9 @@ package-lock.json
 
 *.iso
 
+server/messages_history.json
+server/client_history.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
